@@ -1430,6 +1430,9 @@ class _POFileParser(object):
                 self.current_token = line
                 self.process(prev_keywords[tokens[1]])
 
+            elif tokens[0].startswith('#'):
+                continue
+
             else:
                 raise IOError('Syntax error in po file %s(line %s)' %
                               (fpath, self.current_line))
