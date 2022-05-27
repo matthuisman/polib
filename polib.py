@@ -34,7 +34,7 @@ default_encoding = 'utf-8'
 # python 2/3 compatibility helpers {{{
 
 
-if sys.version_info[:2] < (3, 0):
+if sys.version_info < (3,):
     PY3 = False
     text_type = unicode
 
@@ -140,7 +140,8 @@ def mofile(mofile, **kwargs):
     Arguments:
 
     ``mofile``
-        string, full or relative path to the mo file or its content (data).
+        string, full or relative path to the mo file or its content (string
+        or bytes).
 
     ``wrapwidth``
         integer, the wrap width, only useful when the ``-w`` option was passed
@@ -193,9 +194,14 @@ def detect_encoding(file, binary_mode=False):
         return True
 
     if not _is_file(file):
-        match = rxt.search(file)
+        try:
+            match = rxt.search(file)
+        except TypeError:
+            match = rxb.search(file)
         if match:
             enc = match.group(1).strip()
+            if not isinstance(enc, text_type):
+                enc = enc.decode('utf-8')
             if charset_exists(enc):
                 return enc
     else:
@@ -690,7 +696,7 @@ class POFile(_BaseFile):
         """
         Convenience method that returns the list of fuzzy entries.
         """
-        return [e for e in self if e.fuzzy]
+        return [e for e in self if e.fuzzy and not e.obsolete]
 
     def obsolete_entries(self):
         """
@@ -1047,7 +1053,7 @@ class POEntry(_BaseEntry):
             prefix = "#| "
         for f in fields:
             val = getattr(self, f)
-            if val:
+            if val is not None:
                 ret += self._str_field(f, prefix, "", val, wrapwidth)
 
         ret.append(_BaseEntry.__unicode__(self, wrapwidth))
@@ -1501,8 +1507,11 @@ class _POFileParser(object):
             if action():
                 self.current_state = state
         except Exception:
-            raise IOError('Syntax error in po file (line %s)' %
-                          self.current_line)
+            fpath = '%s ' % self.instance.fpath if self.instance.fpath else ''
+            if hasattr(self.fhandle, 'close'):
+                self.fhandle.close()
+            raise IOError('Syntax error in po file %s(line %s)' %
+                          (fpath, self.current_line))
 
     # state handlers
 
@@ -1672,7 +1681,10 @@ class _MOFileParser(object):
             whether to check for duplicate entries when adding entries to the
             file (optional, default: ``False``).
         """
-        self.fhandle = open(mofile, 'rb')
+        if _is_file(mofile):
+            self.fhandle = open(mofile, 'rb')
+        else:
+            self.fhandle = io.BytesIO(mofile)
 
         klass = kwargs.get('klass')
         if klass is None:
@@ -1688,7 +1700,7 @@ class _MOFileParser(object):
         Make sure the file is closed, this prevents warnings on unclosed file
         when running tests with python >= 3.2.
         """
-        if self.fhandle:
+        if self.fhandle and hasattr(self.fhandle, 'close'):
             self.fhandle.close()
 
     def parse(self):

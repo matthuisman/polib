@@ -97,6 +97,14 @@ msgstr "bar"
         po = polib.pofile('tests/test_obsolete_previousmsgid.po')
         self.assertTrue(isinstance(po, polib.POFile))
 
+    def test_pofile_and_mofile10(self):
+        """
+        Test mofile with a bytes object.
+        """
+        mo_bytes = b"\xde\x12\x04\x95\x00\x00\x00\x00\x05\x00\x00\x00\x1c\x00\x00\x00D\x00\x00\x00\x07\x00\x00\x00l\x00\x00\x00\x00\x00\x00\x00\x88\x00\x00\x00\x10\x00\x00\x00\x89\x00\x00\x00\x07\x00\x00\x00\x9a\x00\x00\x00\x0c\x00\x00\x00\xa2\x00\x00\x00\x0b\x00\x00\x00\xaf\x00\x00\x00(\x00\x00\x00\xbb\x00\x00\x00\n\x00\x00\x00\xe4\x00\x00\x00\x10\x00\x00\x00\xef\x00\x00\x00\x0f\x00\x00\x00\x00\x01\x00\x00\x16\x00\x00\x00\x10\x01\x00\x00\x01\x00\x00\x00\x03\x00\x00\x00\x05\x00\x00\x00\x00\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x00SNAR_BEZEICHNUNG\x00conform\x00inconclusive\x00non-conform\x00Content-Type: text/plain; charset=UTF-8\n\x00Feldfrucht\x00\xc3\x9cbereinstimmung\x00Nicht eindeutig\x00Keine \xc3\x9cbereinstimmung\x00"
+        mo = polib.mofile(mo_bytes)
+        self.assertTrue(isinstance(mo, polib.MOFile))
+
     def test_ufeff_data_pofile(self):
         """
         Test that an ufeff prefixed pofile returns a POFile instance.
@@ -138,6 +146,23 @@ msgstr "bar"
         expected = "Partition table entries are not in disk order2\n"
         self.assertEqual(
             po[1].previous_msgid,
+            expected
+        )
+
+    def test_previous_msgid_3(self):
+        """
+        Test saving empty previous msgid.
+        """
+        po = polib.pofile('tests/test_previous_msgid.po')
+        fd, tmpfile = tempfile.mkstemp()
+        os.close(fd)
+        po.save(tmpfile)
+        po = polib.pofile(tmpfile)
+        os.remove(tmpfile)
+
+        expected = ""
+        self.assertEqual(
+            po[2].previous_msgid,
             expected
         )
 
@@ -227,6 +252,18 @@ msgstr ""
         except IOError:
             exc = sys.exc_info()[1]
             msg = 'Syntax error in po file (line 4): unescaped double quote found'
+            self.assertEqual(str(exc), msg)
+
+    def test_syntax_error1(self):
+        """
+        Test that syntax error is raised while processing a symbol parsing.
+        """
+        try:
+            polib.pofile('tests/test_syntax_error1.po')
+            self.fail("Syntax error not detected")
+        except IOError:
+            exc = sys.exc_info()[1]
+            msg = "Syntax error in po file tests/test_syntax_error1.po (line 5)"
             self.assertEqual(str(exc), msg)
 
     def test_detect_encoding1(self):
@@ -702,6 +739,9 @@ class TestPoFile(unittest.TestCase):
         )
         self.assertEqual(entry, other)
 
+    def test_fuzzy_obsolete(self):
+        pofile = polib.pofile('tests/test_obsolete_is_not_fuzzy.po')
+        self.assertEqual(len(pofile.fuzzy_entries()), 1)
 
 class TestMoFile(unittest.TestCase):
     """
